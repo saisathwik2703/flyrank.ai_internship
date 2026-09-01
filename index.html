@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A public-safe FlyRank ML Internship capstone on ranking content pages for refresh review using an explainable baseline and a client-holdout-validated random forest.">
+<title>Which pages should be reviewed first for content refresh?</title>
+<style>
+:root{
+  --bg:#f7f8fb; --paper:#ffffff; --ink:#172033; --muted:#5d6678;
+  --line:#e4e8f0; --accent:#3157d5; --accent2:#163da8; --soft:#eef3ff;
+  --good:#176b44; --warn:#855b08;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+a{color:var(--accent2)}
+.wrap{max-width:1040px;margin:auto;padding:0 22px}
+.hero{padding:72px 0 48px;background:linear-gradient(135deg,#101936,#243d91)}
+.hero,.hero a{color:white}
+.kicker{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;opacity:.78;font-weight:700}
+h1{font-size:clamp(2.25rem,6vw,4.5rem);line-height:1.02;margin:.35rem 0 1.1rem;max-width:900px}
+.deck{max-width:780px;font-size:1.17rem;color:#dfe6ff}
+.meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:28px;color:#cbd5ff;font-size:.93rem}
+nav{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(10px)}
+nav .wrap{display:flex;gap:18px;overflow:auto;padding-top:11px;padding-bottom:11px}
+nav a{text-decoration:none;color:#394155;white-space:nowrap;font-size:.9rem;font-weight:650}
+main{padding:34px 0 70px}
+section{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:34px;margin:22px 0;box-shadow:0 7px 24px rgba(23,32,51,.04)}
+h2{font-size:1.65rem;margin:0 0 16px}
+h3{font-size:1.1rem;margin:26px 0 8px}
+.abstract{font-size:1.05rem}
+.callout{border-left:4px solid var(--accent);background:var(--soft);padding:16px 18px;border-radius:8px;margin:18px 0}
+.warning{border-left-color:#d29a24;background:#fff8e8}
+.good{border-left-color:#2a9a67;background:#edf9f3}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.card{border:1px solid var(--line);border-radius:12px;padding:18px;background:#fbfcff}
+.card strong{display:block;font-size:1.6rem;line-height:1.2}
+.small{font-size:.9rem;color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.86rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.chart{margin:26px 0}
+.bar-row{display:grid;grid-template-columns:145px 1fr 60px;gap:10px;align-items:center;margin:10px 0}
+.track{height:22px;background:#edf0f6;border-radius:999px;overflow:hidden}
+.fill{height:100%;background:linear-gradient(90deg,#3157d5,#6785e7);border-radius:999px}
+.caption{font-size:.92rem;color:var(--muted);margin-top:10px}
+.rank{counter-reset:item;padding:0}
+.rank li{list-style:none;position:relative;padding:14px 14px 14px 54px;border-bottom:1px solid var(--line)}
+.rank li:before{counter-increment:item;content:counter(item);position:absolute;left:8px;top:13px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--accent2);font-weight:800}
+code{background:#f1f3f7;padding:.12em .35em;border-radius:5px;font-size:.9em}
+pre{background:#111827;color:#e5e7eb;padding:18px;border-radius:12px;overflow:auto}
+footer{padding:20px 0 60px;color:var(--muted)}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.bar-row{grid-template-columns:110px 1fr 45px}section{padding:24px 20px}.hero{padding-top:54px}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">FlyRank ML Internship · Capstone Research Artifact</div>
+    <h1>Which pages should be reviewed first for content refresh?</h1>
+    <p class="deck">A client-holdout-validated comparison of a transparent rule baseline against machine-learned models for prioritizing content review, evaluated on the FlyRank starter dataset.</p>
+    <div class="meta">
+      <span>Lane: Refresh / Content Opportunity Scoring</span>
+      <span>Repository: <a href="https://github.com/saisathwik2703/flyrank.ai_internship">flyrank.ai_internship</a></span>
+    </div>
+  </div>
+</header>
+
+<nav><div class="wrap">
+<a href="#abstract">Abstract</a><a href="#problem">Problem</a><a href="#data">Data</a><a href="#method">Methodology</a>
+<a href="#results">Results</a><a href="#limits">Limitations</a><a href="#recommendations">Recommendations</a>
+<a href="#repro">Reproducibility</a><a href="#credit">Data credit</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="abstract">
+<h2>Abstract</h2>
+<p class="abstract">Content teams need a way to prioritize which pages to refresh, but manual review doesn't scale and simple traffic snapshots miss compounding decline. This project frames refresh prioritization as a binary classification problem &mdash; predicting whether a page's 90-day search trend is declining &mdash; using 18 numeric and 8 categorical features derived from search visibility, position, and engagement metrics, with no titles, URLs, or client identifiers used as inputs. Three classifiers (logistic regression, decision tree, random forest) were trained and evaluated against a transparent rule-based baseline, using a client-holdout split to prevent one client's pages from leaking between train and test. Random forest was the strongest model, most notably at Precision@50 (0.740 vs. 0.240 for the baseline), meaning the top of its ranked queue is meaningfully more useful than the top of the baseline's queue for a reviewer working through a short list. Results are presented as decision-support for a human-reviewed refresh queue, not as an automated publishing or causal-impact system.</p>
+</section>
+
+<section id="problem">
+<h2>Introduction / Problem statement</h2>
+<p>Search content decays for many reasons &mdash; competitors improve, search intent shifts, information goes stale &mdash; and a content team with hundreds or thousands of pages cannot manually review all of them on a regular cadence. The practical decision this project supports is: given a limited review budget, which pages should a content team look at first?</p>
+<p>A naive answer &mdash; sort by traffic and start at the top &mdash; ignores whether a page is actually declining, stable, or already well-optimized, and wastes review time on pages that don't need attention. A better answer requires combining multiple signals (visibility trend, position, click-through rate, engagement, content freshness, and length) into a single ranked, explainable queue that a reviewer can act on with a clear reason for each recommendation.</p>
+<p>This work builds and evaluates such a queue: it defines a concrete, measurable proxy for "needs review" (90-day declining trend), compares a transparent rule-based score against machine-learned models, and reports honestly on where the model helps, where it doesn't, and what its recommendations should &mdash; and shouldn't &mdash; be used for.</p>
+</section>
+
+<section id="data">
+<h2>Data</h2>
+<div class="grid">
+<div class="card"><strong>30,000</strong><span class="small">content pages in the evaluated sample</span></div>
+<div class="card"><strong>44</strong><span class="small">anonymized columns per page</span></div>
+<div class="card"><strong>32</strong><span class="small">distinct clients represented</span></div>
+</div>
+<p><strong>Source:</strong> FlyRank ML Internship dataset, bundled anonymized starter release (<code>data/raw/content_refresh_anonymized.csv</code>).</p>
+<p><strong>Filtering:</strong> rows were required to have <code>impressions_90d &gt; 0</code> and <code>content_age_days &gt;= 90</code> before being included &mdash; pages with no measured visibility or too little history to have an established trend were excluded, since neither the label nor the refresh-priority framing is meaningful for them. All 30,000 raw rows passed this filter in the sample used here.</p>
+<p><strong>Excluded by design:</strong> no titles, URLs, domains, client names, or raw search-query text were used as features or reported anywhere in this paper. <code>client_id</code> is retained only to define the train/test split, never as a model feature.</p>
+<div class="callout warning"><strong>Scope note.</strong> This paper's results are scoped entirely to the 30,000-row anonymized starter sample. The full &sim;79M-row warehouse release (<code>FlyRank/internship-warehouse</code> on Hugging Face) was not evaluated as part of this analysis.</div>
+</section>
+
+<section id="method">
+<h2>Methodology</h2>
+<h3>Target and features</h3>
+<p>We frame content-refresh prioritization as a binary classification problem: <code>is_declining_label = 1</code> when a page's <code>trend_direction</code> is <code>down</code>, <code>0</code> otherwise, computed over a 90-day window.</p>
+<h3>Baseline</h3>
+<p>The transparent baseline combines visibility, freshness risk, position opportunity, and content-depth gap:</p>
+<pre>baseline_refresh_score =
+  0.40 * visibility_score
++ 0.30 * freshness_risk_score
++ 0.25 * position_opportunity_score
++ 0.05 * depth_gap_score</pre>
+<h3>Models and split design</h3>
+<p>Validation uses a client-holdout split, not a random row-level split. With only 32 clients averaging roughly 937 pages each, a random row-level split would scatter a client's pages so that some rows land in the training set and others land in the test set, meaning the model could implicitly learn client-specific patterns even without <code>client_id</code> ever being used as a feature, because pages from the same client tend to share characteristics and patterns. We confirmed this directly: a naive random split produced Avg Precision of 0.768 and Precision@50 of 0.90, compared to 0.618 and 0.74 under the client-holdout split, while ROC AUC barely changed (0.758 vs 0.750). This pattern &mdash; AUC roughly stable, precision-style metrics inflated &mdash; indicates data leakage from client overlap between training and test sets rather than genuine model improvement. All results reported in this paper use the client-holdout split for exactly this reason.</p>
+<p>Model selection uses Precision@50 as the primary metric, reflecting the realistic constraint that a content team can only act on a short ranked list, not the full corpus.</p>
+</section>
+
+<section id="results">
+<h2>Results</h2>
+<table>
+<thead><tr><th>Method</th><th>ROC AUC</th><th>Average precision</th><th>Precision@50</th></tr></thead>
+<tbody>
+<tr><td>Baseline rules</td><td>0.627</td><td>0.468</td><td>0.240</td></tr>
+<tr><td>Logistic regression</td><td>0.700</td><td>0.522</td><td>0.400</td></tr>
+<tr><td>Decision tree</td><td>0.742</td><td>0.575</td><td>0.660</td></tr>
+<tr><td><strong>Random forest</strong></td><td><strong>0.750</strong></td><td><strong>0.618</strong></td><td><strong>0.740</strong></td></tr>
+</tbody></table>
+
+<div class="chart" aria-label="Precision at 50 comparison">
+<h3>Precision@50</h3>
+<div class="bar-row"><span>Baseline</span><div class="track"><div class="fill" style="width:24%"></div></div><strong>0.24</strong></div>
+<div class="bar-row"><span>Logistic reg.</span><div class="track"><div class="fill" style="width:40%"></div></div><strong>0.40</strong></div>
+<div class="bar-row"><span>Decision tree</span><div class="track"><div class="fill" style="width:66%"></div></div><strong>0.66</strong></div>
+<div class="bar-row"><span>Random forest</span><div class="track"><div class="fill" style="width:74%"></div></div><strong>0.74</strong></div>
+</div>
+
+<h3>Results interpretation</h3>
+<p>Precision@50 shows a substantially larger difference between the random forest and the baseline rules (the hand-written scoring formula) than ROC AUC. Precision@50 is 0.740 for the random forest compared with 0.240 for the baseline rules, a difference of 0.500. In practical terms, among the top 50 items selected for review, the random forest identifies approximately 37 relevant items, compared with approximately 12 relevant items for the baseline rules. In contrast, ROC AUC is 0.750 for the random forest and 0.627 for the baseline rules, a smaller difference of 0.123. This indicates that although the random forest has better overall ranking performance, the difference becomes substantially more pronounced when focusing specifically on the highest-priority items. This distinction is particularly important for a review-queue workflow, where reviewers typically act on the top-ranked items rather than the entire set of predictions. On this holdout evaluation, Precision@50 therefore provides the more directly relevant measure of the quality of the review queue, showing that the random forest places substantially more relevant items among the first 50 cases presented for review.</p>
+
+<h3>Feature importance interpretation</h3>
+<p><code>days_with_impressions</code> measures the consistency of search visibility over the last 90 days by counting the number of distinct days on which a page received impressions, whereas <code>log_impressions_90d</code> measures the total volume of impressions over the same period. A page could have high total impressions concentrated in a short period, while another could have modest impressions spread consistently across most of the 90 days; the latter pattern is more indicative of stable search visibility, whereas a drop in the number of active-impression days can signal that a page is becoming less consistently visible. This helps explain why <code>days_with_impressions</code> (0.1581) ranks above <code>log_impressions_90d</code> (0.1286): consistency can capture a change in search visibility that a total-volume measure may smooth over. <code>avg_position</code> (0.1092) provides a related but distinct signal by capturing a page's average search ranking, which can reflect worsening visibility even before the resulting traffic decline is fully reflected in impression volume. However, these <code>feature_importances_</code> values indicate that the features were useful for the random forest's splitting decisions; they do not establish that any feature causes a page to decline.</p>
+</section>
+
+<section id="limits">
+<h2>Limitations &amp; honest framing</h2>
+<p>The results reported in this paper are based on the 30k-row starter sample, and the full &sim;79M-row warehouse has not yet been evaluated, so the findings may not generalize to the complete dataset. The client-holdout evaluation uses 6 clients out of 32, meaning the reported Precision@50 of 0.740 could shift if those six clients were unusually easy or difficult; evaluation across a larger number of held-out clients would provide greater confidence in the estimate. The <code>is_declining_label</code> represents a 90-day trailing measurement of trend direction, so predicting that a page shows a recent decline pattern does not identify the cause of the decline or establish that refreshing the page will fix it. A Precision@50 of 0.740 is an observed, measured, directional decision-support result on this evaluation; it is not a claim about Google's algorithm and does not represent an automated publishing system. Finally, 54.2% of pages in the sample are labeled as declining, which is relatively close to a balanced 50/50 split; therefore, high accuracy would not be artificially inflated by a very rare positive class, as it could be in a highly imbalanced dataset.</p>
+</section>
+
+<section id="recommendations">
+<h2>Ranked recommendations</h2>
+<p>Based on the final refresh queue (30,000 scored pages, blending model probability at 70% with the baseline score at 30%), we recommend content teams work through the queue in the following priority order:</p>
+<ol class="rank">
+<li><strong>High-confidence <code>refresh_and_review_ctr</code> and <code>refresh_and_review_engagement</code> items (2,818 pages combined).</strong> These pages have measurable traffic, a declining trend, and a specific diagnosed weakness &mdash; either underperforming click-through rate relative to their position, or low engagement/scroll behavior relative to their session volume.</li>
+<li><strong>High-confidence <code>refresh</code> items (776 pages).</strong> Pages that are stale or declining without one of the more specific CTR/engagement flags. Still a strong priority, but expect more open-ended diagnosis.</li>
+<li><strong>Medium-confidence items (11,398 pages).</strong> Worth a lighter review pass rather than immediate action &mdash; the refresh score is elevated, but one of the traffic or engagement thresholds that would earn "high" confidence wasn't fully met.</li>
+<li><strong>Monitor items (13,083 pages, none high-confidence).</strong> We explicitly recommend against treating this as a work queue. 88.8% of monitor items were also low-confidence, and the declining rate within monitor was only 20.2% &mdash; well below the queue average.</li>
+</ol>
+<div class="callout good"><strong>Intended use:</strong> reviewer-prioritization rankings for manual verification. <strong>Not intended for:</strong> automated publishing, causal attribution, or any claim about how a search engine's ranking algorithm works. Every recommendation should be manually verified against the actual page and editorial context before action is taken.</div>
+</section>
+
+<section id="repro">
+<h2>Reproducibility</h2>
+<p>All code, notebooks, and outputs for this analysis are available in the accompanying repository:</p>
+<ul>
+<li>Weekly assignment notebooks: <code>work/notebooks/</code> (<code>w01_research_question</code> through <code>w07_action_playbook</code>)</li>
+<li>Capstone notebook: <code>work/notebooks/capstone.ipynb</code></li>
+<li>Pipeline scripts: <code>scripts/01_prepare_features.py</code> through <code>scripts/05_build_pdf_report.py</code></li>
+<li>Generated outputs: <code>outputs/model_report.md</code>, <code>outputs/refresh_queue.csv</code>, <code>outputs/charts/</code></li>
+</ul>
+<p>Repository: <a href="https://github.com/saisathwik2703/flyrank.ai_internship">https://github.com/saisathwik2703/flyrank.ai_internship</a></p>
+<p>Results in this paper were generated on the bundled starter sample (<code>data/raw/content_refresh_anonymized.csv</code>); running <code>python scripts/run_all.py</code> reproduces the full pipeline end to end on that same data.</p>
+</section>
+
+<section id="credit">
+<h2>Acknowledgments &amp; data credit</h2>
+<p>Built on the <a href="https://flyrank.ai/" target="_blank" rel="noopener">FlyRank ML Internship dataset</a>.</p>
+</section>
+
+</main>
+<footer><div class="wrap">Public-safe research artifact · No client names, raw URLs, private queries, or reversible identifiers are included.</div></footer>
+</body></html>
